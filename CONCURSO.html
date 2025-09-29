@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calendário de Estudos — Concurso CRP‑13</title>
+  <style>
+    :root{
+      --bg:#0f1724;--card:#0b1220;--muted:#94a3b8;--accent:#7c3aed;--accent-2:#06b6d4;--glass: rgba(255,255,255,0.03);
+      --white:#e6eef8;--radius:12px;--gap:12px;font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071026 0%, #081325 60%);color:var(--white);}
+    .app{max-width:1100px;margin:28px auto;padding:20px;}
+    header{display:flex;gap:16px;align-items:center;justify-content:space-between}
+    h1{font-size:20px;margin:0}
+    .controls{display:flex;gap:8px;align-items:center}
+    button.btn{background:var(--glass);border:1px solid rgba(255,255,255,0.04);color:var(--white);padding:8px 12px;border-radius:10px;cursor:pointer}
+    button.btn:active{transform:translateY(1px)}
+    .grid{display:grid;grid-template-columns:1fr 320px;gap:18px;margin-top:18px}
+
+    /* Calendar */
+    .calendar{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:var(--radius);box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    .monthHead{display:flex;align-items:center;justify-content:space-between}
+    .weekdays{display:grid;grid-template-columns:repeat(7,1fr);margin-top:14px;color:var(--muted);font-size:13px}
+    .days{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:10px}
+    .day{min-height:84px;background:transparent;border-radius:10px;padding:8px;position:relative;border:1px dashed rgba(255,255,255,0.02)}
+    .day.inactive{opacity:0.22}
+    .day .date{font-weight:600}
+    .event{display:block;margin-top:8px;padding:6px 8px;border-radius:8px;font-size:12px;line-height:1.1;max-height:54px;overflow:hidden}
+    .event.study{background:linear-gradient(90deg,var(--accent),#5b21b6);color:white}
+    .event.revision{background:linear-gradient(90deg,var(--accent-2),#0891b2);color:white}
+    .today{outline:2px solid rgba(124,58,237,0.16);}
+
+    /* side panel */
+    .side{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:16px;border-radius:var(--radius);height:100%;}
+    .side h3{margin:0 0 12px 0}
+    .eventList{display:flex;flex-direction:column;gap:10px;max-height:560px;overflow:auto;padding-right:6px}
+    .evCard{background:rgba(255,255,255,0.02);padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.02)}
+    .evCard .evTitle{font-weight:700}
+    .evCard .evDate{font-size:13px;color:var(--muted)}
+
+    /* modal */
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,0.6);z-index:60}
+    .modal.open{display:flex}
+    .modalCard{background:var(--card);padding:18px;border-radius:14px;max-width:680px;width:94%;color:var(--white)}
+    .modalCard h4{margin:0 0 8px 0}
+    .modalCard p{margin:6px 0;color:var(--muted)}
+    .breakdown{margin-top:8px;padding-left:14px}
+    .legend{display:flex;gap:8px;align-items:center;margin-top:8px}
+    .legend span{display:inline-block;width:12px;height:12px;border-radius:3px}
+    .legend .study{background:linear-gradient(90deg,var(--accent),#5b21b6)}
+    .legend .revision{background:linear-gradient(90deg,var(--accent-2),#0891b2)}
+
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+
+    /* responsive */
+    @media (max-width:880px){
+      .grid{grid-template-columns:1fr;}
+      .side{order:2}
+      .calendar{order:1}
+      .day{min-height:72px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Calendário de Estudos — Concurso CRP‑13 (Analista Administrativo)</h1>
+        <div style="font-size:13px;color:var(--muted);margin-top:6px">2h30/dia • Seg–Sáb • Período: 29/09/2025 → 29/11/2025 • Prova: 30/11/2025</div>
+      </div>
+      <div class="controls">
+        <button class="btn" id="todayBtn">Hoje</button>
+        <button class="btn" id="prevBtn">◀</button>
+        <button class="btn" id="nextBtn">▶</button>
+        <div style="width:8px"></div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="calendar">
+        <div class="monthHead">
+          <div id="monthLabel" style="font-weight:700;font-size:16px"></div>
+          <div style="display:flex;gap:8px;align-items:center;color:var(--muted)"><div id="rangeLabel"></div></div>
+        </div>
+
+        <div class="weekdays">
+          <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+        </div>
+
+        <div class="days" id="daysContainer"></div>
+      </section>
+
+      <aside class="side">
+        <h3>Eventos próximos</h3>
+        <div class="eventList" id="eventList"></div>
+        <div style="height:10px"></div>
+        <div style="font-size:13px;color:var(--muted)">Clique em um dia para ver os detalhes. Você pode navegar pelos meses com as setas.</div>
+        <div class="legend">
+          <div style="margin-top:12px">Legendas:</div>
+          <div style="display:flex;gap:6px;align-items:center;margin-left:8px"><span class="study"></span><div style="font-size:13px;color:var(--muted)">Estudo / Teoria & Questões</div></div>
+          <div style="display:flex;gap:6px;align-items:center;margin-left:8px"><span class="revision"></span><div style="font-size:13px;color:var(--muted)">Revisão / Simulados</div></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer>Plano de Estudo - João Paulo e Rebequinha</footer>
+  </div>
+
+  <!-- modal -->
+  <div class="modal" id="modal">
+    <div class="modalCard">
+      <button style="float:right" id="closeModal" class="btn">Fechar</button>
+      <h4 id="modalTitle"></h4>
+      <p id="modalDate"></p>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    // helper to create local Date from yyyy-mm-dd
+    function parseYMD(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+    function fmt(d){ return d.toLocaleDateString('pt-BR'); }
+    function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+    const START = parseYMD('2025-09-29');
+    const END = parseYMD('2025-11-29');
+    const EXAM = parseYMD('2025-11-30');
+
+    // manual detailed schedule (cada entrada tem date, title, breakdown - blocos de estudo)
+    const MANUAL_EVENTS = [
+      {date:'2025-09-29', title:'Português — interpretação + Questões', breakdown:['1h15 — Português: interpretação de textos (foco em leitura crítica e inferência)','1h15 — Resolução: questões de provas anteriores (interpretação e gramática)'], type:'study'},
+      {date:'2025-09-30', title:'Administração Geral + Administração Pública', breakdown:['1h15 — Administração Geral: teorias, funções (planejamento, organização)','1h15 — Administração Pública: princípios, estrutura, introdução ao art. 37'], type:'study'},
+
+      {date:'2025-10-01', title:'Matemática básica + Questões', breakdown:['1h15 — Matemática: frações, razão e proporção, regra de três','1h15 — Resolução: questões práticas e exercícios cronometrados'], type:'study'},
+      {date:'2025-10-02', title:'Gestão de Pessoas + Finanças Públicas', breakdown:['1h15 — Gestão de Pessoas: recrutamento, seleção e indicadores','1h15 — Finanças Públicas: noções de orçamento e ciclo orçamentário'], type:'study'},
+      {date:'2025-10-03', title:'Informática (Word/Excel) + Atualidades', breakdown:['1h15 — Informática: Word/Excel (práticas essenciais, fórmulas básicas)','1h15 — Atualidades: leitura resumida da semana, flashcards de temas relevantes'], type:'study'},
+      {date:'2025-10-04', title:'Revisão da semana + Mini simulado (20 q)', breakdown:['1h00 — Revisão: mapas mentais e correção de anotações','1h30 — Mini simulado (20 questões) + correção orientada'], type:'revision'},
+
+      {date:'2025-10-06', title:'Português (gramática: classes) + Questões', breakdown:['1h15 — Gramática: classes de palavras e exercícios práticos','1h15 — Questões: aplicar teoria em questões de banca'], type:'study'},
+      {date:'2025-10-07', title:'Administração (organização/planning) + Pública', breakdown:['1h15 — Organização: estruturas e departamentalização','1h15 — Planejamento: tipos, instrumentos e panorama na administração pública'], type:'study'},
+      {date:'2025-10-08', title:'Raciocínio Lógico (proposições) + Questões', breakdown:['1h15 — Teoria: proposições, conectivos, tabelas-verdade básicas','1h15 — Questões: exercícios comentados e resolução rápida'], type:'study'},
+      {date:'2025-10-09', title:'Gestão de Pessoas (liderança) + Finanças (receita/despesa)', breakdown:['1h15 — Liderança e motivação: estilos e aplicação','1h15 — Finanças: conceitos de receita, despesa, classificações e exemplos práticos'], type:'study'},
+      {date:'2025-10-10', title:'Informática (internet/segurança) + Atualidades', breakdown:['1h15 — Internet e segurança: navegação segura, phishing, senhas','1h15 — Atualidades: leitura e notas sobre política e economia recente'], type:'study'},
+      {date:'2025-10-11', title:'Revisão da semana + Mini simulado', breakdown:['1h00 — Revisão: pontos fracos identificados durante a semana','1h30 — Mini simulado (20–30 q) + correção rápida'], type:'revision'},
+
+      {date:'2025-10-13', title:'Português (crase/concordância) + Questões', breakdown:['1h15 — Estudo direcionado: crase, concordância verbal e nominal','1h15 — Questões: exercícios e revisão de erros comuns'], type:'study'},
+      {date:'2025-10-14', title:'Administração (funções) + Administração Pública', breakdown:['1h15 — Funções administrativas (planejar, organizar, dirigir, controlar)','1h15 — Casos práticos na administração pública'], type:'study'},
+      {date:'2025-10-15', title:'Raciocínio Lógico (tabelas-verdade) + Questões', breakdown:['1h15 — Tabelas-verdade e relações lógicas','1h15 — Questões: aplicação e tempo de resolução'], type:'study'},
+      {date:'2025-10-16', title:'Gestão de Pessoas (avaliação) + Finanças (LDO/LOA/PPA)', breakdown:['1h15 — Avaliação de desempenho e indicadores de RH','1h15 — Noções: LDO, LOA, PPA — diferenças e finalidade'], type:'study'},
+      {date:'2025-10-17', title:'Informática (PowerPoint/email) + Atualidades', breakdown:['1h15 — PowerPoint e e-mail profissional: boas práticas e exercícios','1h15 — Atualidades: revisão semanal e fichamento'], type:'study'},
+      {date:'2025-10-18', title:'Revisão + Mini simulado', breakdown:['1h00 — Revisão: checklist por disciplina','1h30 — Mini simulado (20–30 q) + correção'], type:'revision'},
+
+      {date:'2025-10-20', title:'Português (pontuação/redação oficial) + Questões', breakdown:['1h15 — Pontuação e normas de redação oficial (ofício, memorando)','1h15 — Questões: interpretação e estrutura de textos oficiais'], type:'study'},
+      {date:'2025-10-21', title:'Administração (teoria clássica/ moderna) + Pública', breakdown:['1h15 — Revisão: teorias clássicas e modernas da administração','1h15 — Aplicações na gestão pública'], type:'study'},
+      {date:'2025-10-22', title:'Raciocínio Lógico (probabilidade básica) + Questões', breakdown:['1h15 — Probabilidade: conceitos e exercícios básicos','1h15 — Questões: resolução por etapas e atalho'], type:'study'},
+      {date:'2025-10-23', title:'Legislação: Constituição (art.37) + Ética', breakdown:['1h15 — Constituição: foco no art. 37 e princípios da administração pública','1h15 — Ética profissional: código, condutas e casos práticos'], type:'study'},
+      {date:'2025-10-24', title:'Informática (Excel avançado/atalhos) + Atualidades', breakdown:['1h15 — Excel: funções úteis (PROCV, filtros, tabelas) e atalhos','1h15 — Atualidades: resumo e atualização de fichas'], type:'study'},
+      {date:'2025-10-25', title:'Revisão + Mini simulado', breakdown:['1h00 — Revisão: consolidação de anotações','1h30 — Mini simulado + correção'], type:'revision'},
+
+      {date:'2025-10-27', title:'Português (coerência/cohesão) + Questões', breakdown:['1h15 — Coerência e coesão textual (princípios e exercícios)','1h15 — Questões: entender erros e melhorar respostas'], type:'study'},
+      {date:'2025-10-28', title:'Administração (processos decisórios) + Pública', breakdown:['1h15 — Processo decisório: técnicas e ferramentas','1h15 — Estudo de casos na administração pública'], type:'study'},
+      {date:'2025-10-29', title:'Raciocínio Lógico (problemas práticos) + Questões', breakdown:['1h15 — Problemas práticos e estratégias de resolução','1h15 — Questões cronometradas e revisão de erros'], type:'study'},
+      {date:'2025-10-30', title:'Legislação (CLT aplicada + CRP‑13) + Ética', breakdown:['1h15 — CLT: tópicos relevantes e aplicabilidade ao cargo','1h15 — Normas e atribuições do CRP‑13 (consultar editais e anexos)'], type:'study'},
+      {date:'2025-10-31', title:'Informática (TI básica/segurança digital) + Atualidades', breakdown:['1h15 — Noções de TI e segurança digital (backups, proteção de dados)','1h15 — Atualidades: revisão e correção de fichas'], type:'study'},
+
+      {date:'2025-11-01', title:'Revisão + Simulado (50 questões)', breakdown:['1h00 — Revisão geral: pontos fracos prioritários','1h30 — Simulado (50 questões) — tempo cronometrado + correção'], type:'revision'},
+
+      {date:'2025-11-03', title:'Português (revisão geral) + Questões', breakdown:['1h15 — Revisão: pontos gramaticais e interpretação','1h15 — Questões: banca Quadrix e similares'], type:'study'},
+      {date:'2025-11-04', title:'Administração (teoria geral) + Pública', breakdown:['1h15 — Teoria geral consolidada: resumo e mapas mentais','1h15 — Administração Pública: casos e legislação correlata'], type:'study'},
+      {date:'2025-11-05', title:'Raciocínio Lógico (questões comentadas) + Matemática prática', breakdown:['1h15 — Questões comentadas de raciocínio lógico','1h15 — Matemática prática: cálculos rápidos e técnicas'], type:'study'},
+      {date:'2025-11-06', title:'Legislação (Constituição/CLT) + Ética', breakdown:['1h15 — Revisão: Constituição e CLT tópicos úteis','1h15 — Ética: estudo de casos e aplicação prática'], type:'study'},
+      {date:'2025-11-07', title:'Informática (questões anteriores) + Atualidades', breakdown:['1h15 — Resolução: questões anteriores de informática','1h15 — Atualidades: acompanhamento de notícias e fichamento'], type:'study'},
+      {date:'2025-11-08', title:'Revisão + Simulado (70 questões)', breakdown:['1h00 — Revisão: consolidação por disciplina','1h30 — Simulado (70 questões) — cronometrado + correção'], type:'revision'},
+
+      {date:'2025-11-10', title:'Português (simulado parcial) + Correção', breakdown:['1h15 — Simulado parcial de Português (tempo cronometrado)','1h15 — Correção e anotação dos erros'], type:'revision'},
+      {date:'2025-11-11', title:'Administração (simulado parcial) + Correção', breakdown:['1h15 — Simulado parcial: Administração','1h15 — Correção: foco em respostas e tempo'], type:'revision'},
+      {date:'2025-11-12', title:'Raciocínio Lógico (simulado parcial) + Correção', breakdown:['1h15 — Simulado parcial: Raciocínio Lógico','1h15 — Correção detalhada e técnicas de atalho'], type:'revision'},
+      {date:'2025-11-13', title:'Legislação + Ética (simulado parcial)', breakdown:['1h15 — Simulado parcial: Legislação','1h15 — Correção: notas e resumo de jurisprudência/leis'], type:'revision'},
+      {date:'2025-11-14', title:'Informática + Atualidades (simulado parcial)', breakdown:['1h15 — Simulado parcial: Informática','1h15 — Correção: revisão de conceitos e atalhos'], type:'revision'},
+      {date:'2025-11-15', title:'Simulado completo (tempo da prova) + Correção', breakdown:['2h30 — Simulado completo (condições da prova) + correção inicial e marcação de erros'], type:'revision'},
+
+      {date:'2025-11-17', title:'Revisão de Português (resumos+erros)', breakdown:['1h15 — Revisão de resumos e anotações','1h15 — Refazer questões erradas e consolidar notas'], type:'study'},
+      {date:'2025-11-18', title:'Revisão de Administração', breakdown:['1h15 — Resumo e mapas mentais de administração','1h15 — Questões-chave e revisão de casos'], type:'study'},
+      {date:'2025-11-19', title:'Revisão de Raciocínio Lógico', breakdown:['1h15 — Revisão de técnicas e atalhos','1h15 — Questões cronometradas para velocidade'], type:'study'},
+      {date:'2025-11-20', title:'Revisão de Legislação + Ética', breakdown:['1h15 — Revisão de legislação essencial (art.37, CLT)','1h15 — Ética: fichas e casos práticos'], type:'study'},
+      {date:'2025-11-21', title:'Revisão de Informática + Atualidades', breakdown:['1h15 — Última revisão de informática (atalhos e comandos) ','1h15 — Atualidades: resumos para flashcards finais'], type:'study'},
+      {date:'2025-11-22', title:'Simulado completo', breakdown:['2h30 — Simulado completo (condições reais) + correção e análise de desempenho'], type:'revision'},
+
+      {date:'2025-11-24', title:'Revisão de Português + Administração', breakdown:['1h15 — Português: revisão rápida de pontos críticos','1h15 — Administração: principais temas e fórmulas mentais'], type:'study'},
+      {date:'2025-11-25', title:'Revisão de Lógico + Informática', breakdown:['1h15 — Lógico: revisão de atalhos e problemas típicos','1h15 — Informática: checklist de comandos e segurança'], type:'study'},
+      {date:'2025-11-26', title:'Revisão de Legislação + Atualidades', breakdown:['1h15 — Legislação: revisão de trechos importantes','1h15 — Atualidades: revisão e atualização das fichas'], type:'study'},
+      {date:'2025-11-27', title:'Revisão geral (resumos e erros)', breakdown:['1h15 — Revisão geral: mapas mentais e anotações finais','1h15 — Corrigir pontos falhos e sintetizar resumos'], type:'revision'},
+      {date:'2025-11-28', title:'Simulado final (tempo de prova)', breakdown:['2h30 — Simulado final (condições reais) + revisão rápida das questões erradas'], type:'revision'},
+      {date:'2025-11-29', title:'Revisão leve (mapas mentais, flashcards)', breakdown:['1h15 — Mapas mentais por disciplina','1h15 — Flashcards e leitura leve'], type:'study'},
+
+      {date:'2025-11-30', title:'DIA DA PROVA — DESCANSO', breakdown:['Dia da prova — descanse, prepare documentos, chegue com antecedência. Não estudar intensamente.'], type:'exam', duration:'--'}
+    ];
+
+    // build events array from MANUAL_EVENTS
+    const events = MANUAL_EVENTS.map(it=>({
+      id: 'm-'+it.date,
+      date: parseYMD(it.date),
+      title: it.title,
+      type: it.type,
+      breakdown: it.breakdown,
+      duration: it.duration || '2h30'
+    }));
+
+    // calendar state
+    let viewDate = new Date(START.getFullYear(), START.getMonth(), 1);
+
+    // DOM refs
+    const monthLabel = document.getElementById('monthLabel');
+    const daysContainer = document.getElementById('daysContainer');
+    const eventList = document.getElementById('eventList');
+    const rangeLabel = document.getElementById('rangeLabel');
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalDate = document.getElementById('modalDate');
+    const modalBody = document.getElementById('modalBody');
+
+    document.getElementById('prevBtn').addEventListener('click',()=> changeMonth(-1));
+    document.getElementById('nextBtn').addEventListener('click',()=> changeMonth(1));
+    document.getElementById('todayBtn').addEventListener('click',()=>{ viewDate = new Date(); viewDate.setDate(1); render(); });
+    document.getElementById('closeModal').addEventListener('click',()=> modal.classList.remove('open'));
+    modal.addEventListener('click',(e)=>{ if(e.target===modal) modal.classList.remove('open')});
+
+    function changeMonth(delta){ viewDate.setMonth(viewDate.getMonth()+delta); render(); }
+
+    function getEventsForDate(date){
+      return events.filter(ev=>ev.date.getFullYear()===date.getFullYear() && ev.date.getMonth()===date.getMonth() && ev.date.getDate()===date.getDate());
+    }
+
+    function render(){
+      const year = viewDate.getFullYear();
+      const month = viewDate.getMonth();
+      monthLabel.textContent = viewDate.toLocaleString('pt-BR',{month:'long', year:'numeric'}).replace(/ de /g,' ');
+      rangeLabel.textContent = `Período: ${fmt(START)} → ${fmt(END)}`;
+
+      daysContainer.innerHTML = '';
+      const first = new Date(year,month,1);
+      const startWeekDay = first.getDay();
+      const daysInMonth = new Date(year,month+1,0).getDate();
+
+      for(let i=0;i<startWeekDay;i++){ const cell = document.createElement('div'); cell.className='day inactive'; daysContainer.appendChild(cell); }
+
+      for(let d=1; d<=daysInMonth; d++){
+        const date = new Date(year,month,d);
+        const cell = document.createElement('div'); cell.className='day';
+        const inRange = (date>=START && date<=END) || ymd(date)===ymd(EXAM);
+        if(!inRange) cell.classList.add('inactive');
+        const now = new Date();
+        if(date.getFullYear()===now.getFullYear() && date.getMonth()===now.getMonth() && date.getDate()===now.getDate()) cell.classList.add('today');
+
+        const dateEl = document.createElement('div'); dateEl.className='date'; dateEl.textContent=d; cell.appendChild(dateEl);
+
+        const evs = getEventsForDate(date);
+        evs.slice(0,2).forEach(ev=>{
+          const evEl = document.createElement('span'); evEl.className='event '+(ev.type==='revision'? 'revision':'study'); evEl.textContent = ev.title; cell.appendChild(evEl);
+        });
+        if(evs.length>2){ const more = document.createElement('div'); more.textContent = `+${evs.length-2} mais`; more.style.marginTop='6px'; more.style.fontSize='12px'; more.style.color='var(--muted)'; cell.appendChild(more); }
+
+        cell.addEventListener('click',()=> openDayDetail(date));
+        daysContainer.appendChild(cell);
+      }
+
+      populateSidebar();
+    }
+
+    function populateSidebar(){
+      const now = new Date();
+      const upcoming = events.filter(e=>e.date>=now).sort((a,b)=>a.date-b.date).slice(0,12);
+      eventList.innerHTML='';
+      if(upcoming.length===0) eventList.innerHTML='<div style="color:var(--muted)">Nenhum evento futuro.</div>';
+      upcoming.forEach(ev=>{
+        const card = document.createElement('div'); card.className='evCard';
+        const title = document.createElement('div'); title.className='evTitle'; title.textContent=ev.title;
+        const date = document.createElement('div'); date.className='evDate'; date.textContent = fmt(ev.date) + (ev.duration? ' • '+ev.duration : '');
+        card.appendChild(title); card.appendChild(date);
+        card.addEventListener('click',()=> openDayDetail(ev.date));
+        eventList.appendChild(card);
+      });
+    }
+
+    function openDayDetail(date){
+      const evs = getEventsForDate(date);
+      modalTitle.textContent = evs.length? evs.map(e=>e.title).join(' — '): 'Sem estudos planejados';
+      modalDate.textContent = fmt(date);
+      modalBody.innerHTML = '';
+      if(evs.length===0){ const p = document.createElement('p'); p.textContent = 'Dia sem estudo programado (domingo ou fora do período). Aproveite para descansar ou revisão leve.'; modalBody.appendChild(p); }
+      else {
+        evs.forEach(e=>{
+          const cont = document.createElement('div'); cont.style.marginBottom='12px';
+          const t = document.createElement('div'); t.style.fontWeight='700'; t.textContent = e.title;
+          const d = document.createElement('div'); d.style.color='var(--muted)'; d.textContent = 'Duração sugerida: '+(e.duration||'2h30');
+          cont.appendChild(t); cont.appendChild(d);
+          if(e.breakdown && e.breakdown.length){
+            const ul = document.createElement('ol'); ul.className='breakdown';
+            e.breakdown.forEach(item=>{ const li = document.createElement('li'); li.style.marginBottom='6px'; li.textContent = item; ul.appendChild(li); });
+            cont.appendChild(ul);
+          }
+          modalBody.appendChild(cont);
+        });
+      }
+      modal.classList.add('open');
+    }
+
+    // initial render
+    render();
+  </script>
+</body>
+</html>
